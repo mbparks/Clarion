@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<!-- CLARION :: clarion-v0.2.0.html :: v0.2.0 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLARION :: UV-5R Memory Bench</title>
+<style>
+  :root{
+    --bg:#12171a; --panel:#1a2126; --panel-2:#141a1e; --rule:#303b42;
+    --ink:#d9e0e4; --ink-dim:#8fa0a9; --amber:#e2a03f; --cyan:#63b7c8;
+    --danger:#e0715c; --ok:#8ec06c; --lcd-bg:#2f5570; --lcd-ink:#dfeef7;
+    --focus:#ffd479; --radius:2px;
+    --f-display:"Futura","Trebuchet MS","Helvetica Neue",Arial,sans-serif;
+    --f-data:ui-monospace,"SF Mono",Menlo,Consolas,"DejaVu Sans Mono",monospace;
+    --f-body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  html[data-theme="daylight"]{
+    --bg:#e6e3dc; --panel:#f4f2ec; --panel-2:#dedbd3; --rule:#b3ada1;
+    --ink:#1d2225; --ink-dim:#565d61; --amber:#8a5a0d; --cyan:#1b6273;
+    --danger:#96311f; --ok:#3a6325; --lcd-bg:#5d8aa8; --lcd-ink:#0e1d26;
+    --focus:#3a3226;
+  }
+  html[data-theme="contrast"]{
+    --bg:#000; --panel:#000; --panel-2:#000; --rule:#fff;
+    --ink:#fff; --ink-dim:#fff; --amber:#ffd400; --cyan:#4fe3ff;
+    --danger:#ff8a70; --ok:#5cff8a; --lcd-bg:#000; --lcd-ink:#fff;
+    --focus:#ffd400;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--f-body);
+    font-size:clamp(13px,0.55vw + 11px,15px); line-height:1.45}
+  header.bench{display:flex; flex-wrap:wrap; align-items:baseline; gap:.6rem 1.1rem;
+    padding:.7rem clamp(.7rem,2vw,1.4rem); border-bottom:1px solid var(--rule); background:var(--panel-2)}
+  .wordmark{font-family:var(--f-display); font-weight:700; letter-spacing:.32em; text-transform:uppercase;
+    font-size:clamp(1.05rem,1.6vw,1.4rem); color:var(--amber)}
+  .subtitle{font-family:var(--f-display); letter-spacing:.18em; text-transform:uppercase;
+    font-size:.72rem; color:var(--ink-dim)}
+  .spacer{flex:1}
+  .stamp{font-family:var(--f-data); font-size:.72rem; color:var(--ink-dim)}
+  main{display:grid; grid-template-columns:minmax(320px,370px) 1fr; min-height:calc(100vh - 52px)}
+  @media (max-width:940px){ main{grid-template-columns:1fr} }
+  .rail{border-right:1px solid var(--rule); background:var(--panel-2);
+    padding:clamp(.7rem,1.5vw,1rem); display:flex; flex-direction:column; gap:.85rem}
+  .work{padding:clamp(.7rem,1.5vw,1rem); min-width:0}
+  fieldset{border:1px solid var(--rule); border-radius:var(--radius); background:var(--panel);
+    margin:0; padding:.6rem .7rem .75rem}
+  legend{font-family:var(--f-display); text-transform:uppercase; letter-spacing:.2em;
+    font-size:.68rem; color:var(--ink-dim); padding:0 .35rem}
+  button{font-family:var(--f-display); text-transform:uppercase; letter-spacing:.12em;
+    font-size:.72rem; font-weight:600; background:var(--panel-2); color:var(--ink);
+    border:1px solid var(--rule); border-radius:var(--radius); padding:.5rem .7rem; cursor:pointer}
+  button:hover:not(:disabled){border-color:var(--amber); color:var(--amber)}
+  button:disabled{opacity:.4; cursor:not-allowed}
+  button.primary{border-color:var(--amber); color:var(--amber)}
+  button.danger{border-color:var(--danger); color:var(--danger)}
+  button.tab{border-color:transparent; color:var(--ink-dim)}
+  button.tab[aria-selected="true"]{border-color:var(--amber); color:var(--amber); background:var(--panel)}
+  :focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+  .btnrow{display:flex; flex-wrap:wrap; gap:.4rem}
+  label{display:block; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-dim); margin-bottom:.2rem}
+  input,select{width:100%; background:var(--panel-2); color:var(--ink); border:1px solid var(--rule);
+    border-radius:var(--radius); padding:.35rem .4rem; font-family:var(--f-data); font-size:.82rem}
+  input[type=checkbox]{width:auto}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:.5rem}
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem}
+  .grid4{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.55rem}
+  .field{min-width:0}
+  .field.unver > label::after{content:" ?"; color:var(--amber)}
+
+  .lcd{background:var(--lcd-bg); color:var(--lcd-ink); border:1px solid var(--rule);
+    border-radius:var(--radius); padding:.55rem .7rem .5rem; font-family:var(--f-data);
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
+  html[data-theme="contrast"] .lcd{box-shadow:none}
+  .lcd .icons{display:flex; gap:.55rem; font-size:.62rem; letter-spacing:.14em;
+    text-transform:uppercase; opacity:.5; margin-bottom:.2rem}
+  .lcd .icons span.on{opacity:1; font-weight:700}
+  .lcd .chno{display:flex; justify-content:space-between; font-size:.7rem; letter-spacing:.2em}
+  .lcd .name{font-size:1rem; letter-spacing:.28em; margin:.1rem 0 .05rem; min-height:1.2em}
+  .lcd .freq{font-size:clamp(1.5rem,3.4vw,2rem); letter-spacing:.06em; font-weight:600; line-height:1.1}
+  .lcd .sub{font-size:.72rem; letter-spacing:.1em; opacity:.85; display:flex; justify-content:space-between}
+
+  .status{font-family:var(--f-data); font-size:.72rem; color:var(--ink-dim); margin:.15rem 0}
+  .status b{color:var(--ink); font-weight:600}
+  .bar{height:6px; background:var(--panel-2); border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden}
+  .bar > i{display:block; height:100%; width:0; background:var(--amber); transition:width .1s linear}
+  .log{font-family:var(--f-data); font-size:.7rem; background:var(--panel-2); border:1px solid var(--rule);
+    border-radius:var(--radius); padding:.4rem; height:130px; overflow:auto; white-space:pre-wrap; color:var(--ink-dim)}
+  .log .err{color:var(--danger)} .log .ok{color:var(--ok)}
+  .note{font-size:.72rem; color:var(--ink-dim)}
+  .warn{border-left:3px solid var(--amber); padding-left:.5rem; font-size:.74rem; color:var(--ink)}
+  .bad{border-left-color:var(--danger)}
+
+  table{border-collapse:collapse; width:100%; font-family:var(--f-data); font-size:.76rem}
+  thead th{position:sticky; top:0; background:var(--panel-2); color:var(--ink-dim);
+    font-family:var(--f-display); text-transform:uppercase; letter-spacing:.12em; font-size:.62rem;
+    text-align:left; padding:.4rem .35rem; border-bottom:1px solid var(--rule); z-index:1}
+  tbody td{padding:.28rem .35rem; border-bottom:1px solid var(--rule); white-space:nowrap}
+  tbody tr.pick{cursor:pointer}
+  tbody tr.pick:hover{background:var(--panel)}
+  tbody tr[aria-selected="true"]{background:var(--panel); box-shadow:inset 3px 0 0 var(--amber)}
+  tbody tr.empty td{color:var(--ink-dim)}
+  .num{color:var(--amber)}
+  .tablewrap{max-height:52vh; overflow:auto; border:1px solid var(--rule);
+    border-radius:var(--radius); background:var(--panel)}
+  .toolbar{display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-bottom:.6rem}
+  .tabs{display:flex; flex-wrap:wrap; gap:.25rem; border-bottom:1px solid var(--rule); margin-bottom:.75rem}
+  .hex{font-family:var(--f-data); font-size:.7rem; color:var(--ink-dim); word-break:break-all}
+  .flags{display:flex; gap:.9rem; flex-wrap:wrap; align-items:center}
+  .flags label{display:flex; gap:.35rem; align-items:center; margin:0; text-transform:none;
+    letter-spacing:0; font-size:.76rem; color:var(--ink)}
+  .hexrow{display:flex; gap:.5rem; align-items:center; margin-bottom:.2rem}
+  .hexrow .addr{font-family:var(--f-data); font-size:.72rem; color:var(--amber); width:6.5em}
+  .hexrow input{font-family:var(--f-data); font-size:.74rem; letter-spacing:.06em}
+  .hexrow .ascii{font-family:var(--f-data); font-size:.72rem; color:var(--ink-dim); width:10em; white-space:pre}
+  dialog{background:var(--panel); color:var(--ink); border:1px solid var(--amber);
+    border-radius:var(--radius); max-width:min(680px,92vw)}
+  dialog::backdrop{background:rgba(0,0,0,.65)}
+  .testrow{font-family:var(--f-data); font-size:.74rem}
+  .testrow.pass::before{content:"PASS  "; color:var(--ok)}
+  .testrow.fail::before{content:"FAIL  "; color:var(--danger)}
+  .pill{font-family:var(--f-data); font-size:.66rem; padding:.05rem .3rem; border:1px solid var(--rule);
+    border-radius:var(--radius); color:var(--ink-dim)}
+  .pill.ok{color:var(--ok); border-color:var(--ok)}
+  .pill.no{color:var(--amber); border-color:var(--amber)}
+  .hidden{display:none !important}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
+</style>
+</head>
+<body>
+<header class="bench">
+  <span class="wordmark">Clarion</span>
+  <span class="subtitle">UV-5R memory bench</span>
+  <span class="spacer"></span>
+  <span class="stamp" id="stamp">v0.2.0</span>
+  <button id="btnUndo" disabled>Undo</button>
+  <button id="btnRedo" disabled>Redo</button>
+  <select id="theme" style="width:auto" aria-label="Theme">
+    <option value="night">Night</option>
+    <option value="daylight">Daylight</option>
+    <option value="contrast">High contrast</option>
+  </select>
+  <button id="btnTest">Self test</button>
+</header>
+
+<main>
+  <section class="rail" aria-label="Bench">
+    <div class="lcd" id="lcd">
+      <div class="icons">
+        <span id="icoTone">TONE</span><span id="icoScan">SCAN</span>
+        <span id="icoBcl">BCL</span><span id="icoLow">LOW</span><span id="icoNar">NAR</span>
+      </div>
+      <div class="chno"><span id="lcdCh">CH 000</span><span id="lcdDup"></span></div>
+      <div class="name" id="lcdName">&nbsp;</div>
+      <div class="freq" id="lcdFreq">---.-----</div>
+      <div class="sub"><span id="lcdTx">TX ---.-----</span><span id="lcdTone">&nbsp;</span></div>
+    </div>
+
+    <fieldset>
+      <legend>Radio</legend>
+      <div class="btnrow">
+        <button id="btnConnect" class="primary">Connect cable</button>
+        <button id="btnDisconnect" disabled>Release</button>
+      </div>
+      <div style="height:.5rem"></div>
+      <div class="btnrow">
+        <button id="btnRead" disabled class="primary">Read from radio</button>
+        <button id="btnWrite" disabled class="danger">Write to radio</button>
+      </div>
+      <div style="height:.5rem"></div>
+      <label for="writeScope">Write scope</label>
+      <select id="writeScope">
+        <option value="dirty">Changed blocks only (recommended)</option>
+        <option value="channels">All channels and names</option>
+        <option value="full">Full image, settings included</option>
+      </select>
+      <div style="height:.5rem"></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div style="height:.35rem"></div>
+      <p class="status" id="radioStatus">Cable: <b>not connected</b></p>
+      <p class="status" id="identStatus">Ident: <b>none</b></p>
+      <p class="status" id="dirtyStatus">Changes: <b>none</b></p>
+      <p class="note" id="serialNote"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Files</legend>
+      <div class="btnrow">
+        <button id="btnOpenImg">Open image</button>
+        <button id="btnSaveImg" disabled>Save image</button>
+        <button id="btnBlank">New blank set</button>
+      </div>
+      <div style="height:.5rem"></div>
+      <div class="btnrow">
+        <button id="btnImportCsv">Import CSV</button>
+        <button id="btnExportCsv" disabled>Export CSV</button>
+      </div>
+      <div style="height:.5rem"></div>
+      <div class="btnrow">
+        <button id="btnExportMap">Save map</button>
+        <button id="btnImportMap">Load map</button>
+      </div>
+      <input type="file" id="fileImg" accept=".img,.bin,.dat" class="hidden">
+      <input type="file" id="fileCsv" accept=".csv,text/csv" class="hidden">
+      <input type="file" id="fileCmp" accept=".img,.bin,.dat" class="hidden">
+      <input type="file" id="fileMap" accept=".json" class="hidden">
+    </fieldset>
+
+    <fieldset>
+      <legend>Log</legend>
+      <div class="flags" style="margin-bottom:.4rem">
+        <label><input type="checkbox" id="dbg"> Verbose byte log</label>
+        <button id="btnClearLog" style="margin-left:auto">Clear</button>
+      </div>
+      <div class="log" id="log" role="log" aria-live="polite"></div>
+    </fieldset>
+  </section>
+
+  <section class="work" aria-label="Memory">
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabChannels" role="tab" aria-selected="true">Channels</button>
+      <button class="tab" id="tabSettings" role="tab" aria-selected="false">Settings</button>
+      <button class="tab" id="tabDtmf" role="tab" aria-selected="false">DTMF</button>
+      <button class="tab" id="tabFm" role="tab" aria-selected="false">FM presets</button>
+      <button class="tab" id="tabMap" role="tab" aria-selected="false">Map and diff</button>
+    </div>
+
+    <!-- CHANNELS -->
+    <div id="paneChannels">
+      <div class="toolbar">
+        <button id="btnUsedOnly">Show used only</button>
+        <button id="btnClearCh" disabled>Clear channel</button>
+        <button id="btnCopyCh" disabled>Copy to next free</button>
+        <span class="spacer"></span>
+        <span class="status" id="countStatus">No image loaded</span>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th>Ch</th><th>Name</th><th>Receive</th><th>Dup</th><th>Offset</th>
+            <th>TX tone</th><th>RX tone</th><th>Mode</th><th>Power</th><th>Scan</th><th>S-code</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <fieldset style="margin-top:.8rem" id="editor" disabled>
+        <legend>Channel editor</legend>
+        <div class="grid3">
+          <div class="field"><label for="fName">Name, 7 characters</label><input id="fName" maxlength="7" autocomplete="off"></div>
+          <div class="field"><label for="fRx">Receive, MHz</label><input id="fRx" inputmode="decimal" autocomplete="off"></div>
+          <div class="field"><label for="fDup">Duplex</label>
+            <select id="fDup">
+              <option value="">Simplex</option><option value="+">Plus</option><option value="-">Minus</option>
+              <option value="split">Split, enter TX below</option><option value="off">TX inhibit</option>
+            </select></div>
+          <div class="field"><label for="fOff">Offset or TX, MHz</label><input id="fOff" inputmode="decimal" autocomplete="off"></div>
+          <div class="field"><label for="fTxTone">TX tone</label><select id="fTxTone"></select></div>
+          <div class="field"><label for="fRxTone">RX tone, squelch</label><select id="fRxTone"></select></div>
+          <div class="field"><label for="fMode">Mode</label>
+            <select id="fMode"><option value="1">Wide, 25 kHz</option><option value="0">Narrow, 12.5 kHz</option></select></div>
+          <div class="field"><label for="fPower">Power</label>
+            <select id="fPower"><option value="0">High</option><option value="1">Low</option></select></div>
+          <div class="field"><label for="fPttid">PTT-ID</label>
+            <select id="fPttid"><option value="0">Off</option><option value="1">Begin</option>
+              <option value="2">End</option><option value="3">Both</option></select></div>
+          <div class="field"><label for="fScode">Signal code, S-CODE</label><select id="fScode"></select></div>
+        </div>
+        <div style="height:.6rem"></div>
+        <div class="flags">
+          <label><input type="checkbox" id="fScan"> Add to scan list</label>
+          <label><input type="checkbox" id="fBcl"> Busy channel lockout</label>
+          <button id="btnApply" class="primary" style="margin-left:auto">Apply to channel</button>
+        </div>
+        <div style="height:.6rem"></div>
+        <p class="warn hidden" id="bandWarn"></p>
+        <p class="hex" id="hexStrip">&nbsp;</p>
+      </fieldset>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="paneSettings" class="hidden">
+      <p class="warn" id="setWarn"></p>
+      <div style="height:.6rem"></div>
+      <div class="grid4" id="setGrid"></div>
+      <div style="height:.8rem"></div>
+      <div class="btnrow">
+        <button id="btnSetApply" class="primary">Apply settings</button>
+        <button id="btnSetRevert">Revert to image</button>
+      </div>
+      <div style="height:.6rem"></div>
+      <p class="note">Fields marked with a question mark sit at offsets that have not been confirmed against a real radio. Use the Map and diff tab to confirm them, then mark the region verified.</p>
+    </div>
+
+    <!-- DTMF -->
+    <div id="paneDtmf" class="hidden">
+      <p class="warn" id="dtmfWarn"></p>
+      <div style="height:.6rem"></div>
+      <fieldset>
+        <legend>Identity and timing</legend>
+        <div class="grid3">
+          <div class="field"><label for="fAni">ANI code, 3 to 5 digits</label><input id="fAni" maxlength="5" autocomplete="off"></div>
+          <div class="field"><label for="fDtmfOn">Send time, units of 10 ms</label><input id="fDtmfOn" inputmode="numeric"></div>
+          <div class="field"><label for="fDtmfOff">Gap time, units of 10 ms</label><input id="fDtmfOff" inputmode="numeric"></div>
+        </div>
+        <div style="height:.5rem"></div>
+        <p class="note">Digits allowed: 0 to 9, A, B, C, D, star, hash.</p>
+      </fieldset>
+      <div style="height:.7rem"></div>
+      <fieldset>
+        <legend>Signal codes, S-CODE 1 to 15</legend>
+        <div class="grid4" id="dtmfGrid"></div>
+      </fieldset>
+      <div style="height:.8rem"></div>
+      <div class="btnrow">
+        <button id="btnDtmfApply" class="primary">Apply DTMF</button>
+        <button id="btnDtmfRevert">Revert to image</button>
+      </div>
+    </div>
+
+    <!-- FM -->
+    <div id="paneFm" class="hidden">
+      <p class="warn" id="fmWarn"></p>
+      <div style="height:.6rem"></div>
+      <div class="grid4" id="fmGrid"></div>
+      <div style="height:.8rem"></div>
+      <div class="btnrow">
+        <button id="btnFmApply" class="primary">Apply presets</button>
+        <button id="btnFmRevert">Revert to image</button>
+        <button id="btnFmClear">Clear all presets</button>
+      </div>
+      <div style="height:.6rem"></div>
+      <p class="note">Broadcast FM presets, 65.0 to 108.0 MHz. Leave a slot empty to disable it.</p>
+    </div>
+
+    <!-- MAP AND DIFF -->
+    <div id="paneMap" class="hidden">
+      <fieldset>
+        <legend>Memory map</legend>
+        <p class="note">Offsets are image offsets. Radio address is the image offset minus 8. A region has to be marked verified before its blocks are written to the radio.</p>
+        <div style="height:.6rem"></div>
+        <div class="tablewrap" style="max-height:none">
+          <table>
+            <thead><tr><th>Region</th><th>Image offset</th><th>Radio address</th><th>Span</th><th>Verified</th></tr></thead>
+            <tbody id="mapBody"></tbody>
+          </table>
+        </div>
+        <div style="height:.6rem"></div>
+        <div class="btnrow">
+          <button id="btnMapApply" class="primary">Apply map</button>
+          <button id="btnMapReset">Reset to defaults</button>
+        </div>
+      </fieldset>
+
+      <div style="height:.8rem"></div>
+      <fieldset>
+        <legend>Finding an unknown offset</legend>
+        <p class="note">Read the radio and save the image. Change one thing on the radio itself, one menu item or one FM preset. Read again, then compare against the saved image. The block that moved is the one you are looking for.</p>
+        <div style="height:.5rem"></div>
+        <div class="btnrow">
+          <button id="btnCmpFile">Compare with image file</button>
+          <button id="btnCmpRef">Compare with last read</button>
+          <button id="btnSetRef">Make current the reference</button>
+        </div>
+        <div style="height:.6rem"></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Image</th><th>Radio</th><th>Region</th><th>Reference</th><th>Current</th></tr></thead>
+            <tbody id="diffBody"></tbody>
+          </table>
+        </div>
+      </fieldset>
+
+      <div style="height:.8rem"></div>
+      <fieldset>
+        <legend>Hex editor</legend>
+        <div class="btnrow" style="align-items:center">
+          <label for="hexGo" style="margin:0">Go to offset, hex</label>
+          <input id="hexGo" value="0E20" style="width:7em">
+          <button id="btnHexGo">Show</button>
+          <button id="btnHexApply" class="danger">Apply rows</button>
+        </div>
+        <div style="height:.6rem"></div>
+        <div id="hexPane"></div>
+        <p class="note">Eight rows of sixteen bytes. Edit a row and apply. This bypasses every guard except the write ranges.</p>
+      </fieldset>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlgTest">
+  <h2 style="font-family:var(--f-display); letter-spacing:.2em; text-transform:uppercase; font-size:.9rem">Self test</h2>
+  <div id="testOut"></div>
+  <div style="height:.8rem"></div>
+  <button id="btnCloseTest">Close</button>
+</dialog>
+
+<dialog id="dlgWrite">
+  <h2 style="font-family:var(--f-display); letter-spacing:.2em; text-transform:uppercase; font-size:.9rem">Write to radio</h2>
+  <p id="writeSummary" class="note"></p>
+  <div id="writeRegions"></div>
+  <p class="warn bad hidden" id="writeUnver">
+    <label style="text-transform:none; letter-spacing:0; color:var(--ink); display:flex; gap:.4rem; align-items:flex-start">
+      <input type="checkbox" id="ackUnver">
+      <span id="ackText"></span>
+    </label>
+  </p>
+  <p class="warn">Save an image backup first. A bad write can leave the radio in a strange state, and the way back is writing a known good image.</p>
+  <div class="btnrow" style="margin-top:.8rem">
+    <button id="btnWriteGo" class="danger">Write now</button>
+    <button id="btnWriteCancel">Cancel</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const VERSION = "0.2.0";
+
+/* ================= memory map ================= */
+const IDENT_LEN = 0x08;
+const MAIN_START = 0x0008, MAIN_END = 0x1808;
+const AUX_IMG = 0x1808, AUX_RADIO = 0x1EC0, AUX_LEN = 0x0140;
+const IMG_SIZE = AUX_IMG + AUX_LEN;             // 6472
+const FW_START = 0x1838, FW_END = 0x1848;
+const CH_COUNT = 128, CH_LEN = 16;
+
+const RANGES_FULL = [[0x0008,0x0CF8],[0x0D08,0x0DF8],[0x0E30,0x1808]];
+const RANGES_CHANNELS = [[0x0008,0x0808],[0x1000,0x1800]];
+
+const MAP_DEFAULT = {
+  channels: {base:0x0008, span:CH_COUNT*CH_LEN, verified:true,  label:"Channels"},
+  names:    {base:0x1000, span:CH_COUNT*CH_LEN, verified:true,  label:"Channel names"},
+  settings: {base:0x0E30, span:0x30,            verified:false, label:"Radio settings"},
+  ani:      {base:0x0CAA, span:0x10,            verified:false, label:"DTMF identity"},
+  scode:    {base:0x0B08, span:15*0x10,         verified:false, label:"DTMF signal codes"},
+  fm:       {base:0x0E60, span:25*2,            verified:false, label:"FM presets"},
+};
+let MAP = structuredClone(MAP_DEFAULT);
+
+const MAGICS = [
+  ["UV-5R, firmware BFB291 and similar", [0x50,0xBB,0xFF,0x20,0x12,0x07,0x25]],
+  ["UV-5R, original firmware",           [0x50,0xBB,0xFF,0x01,0x25,0x98,0x4D]],
+  ["BF-F11 and relatives",               [0x50,0xBB,0xFF,0x13,0xA1,0x11,0xDD]],
+  ["UV-82",                              [0x50,0xBB,0xFF,0x20,0x13,0x01,0x05]],
+  ["UV-6",                               [0x50,0xBB,0xFF,0x20,0x12,0x08,0x23]],
+  ["BF-A58",                             [0x50,0xBB,0xFF,0x20,0x14,0x04,0x13]],
+];
+
+const CTCSS = [67.0,69.3,71.9,74.4,77.0,79.7,82.5,85.4,88.5,91.5,94.8,97.4,100.0,103.5,107.2,110.9,
+ 114.8,118.8,123.0,127.3,131.8,136.5,141.3,146.2,151.4,156.7,159.8,162.2,165.5,167.9,171.3,173.8,
+ 177.3,179.9,183.5,186.2,189.9,192.8,196.6,199.5,203.5,206.5,210.7,213.8,218.1,221.3,225.7,229.1,
+ 233.6,237.1,241.8,245.5,250.3,254.1];
+const DCS = [23,25,26,31,32,36,43,47,51,53,54,65,71,72,73,74,114,115,116,122,125,131,132,134,143,145,
+ 152,155,156,162,165,172,174,205,212,223,225,226,243,244,245,246,251,252,255,261,263,265,266,271,274,
+ 306,311,315,325,331,332,343,346,351,356,364,365,371,411,412,413,423,431,432,445,446,452,454,455,462,
+ 464,465,466,503,506,516,523,526,532,546,565,606,612,624,627,631,632,654,662,664,703,712,723,731,732,
+ 734,743,754];
+const NAME_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ +-*/_";
+const DTMF_CHARS = "0123456789ABCD*#";
+
+/* Settings fields. off is relative to MAP.settings.base. */
+const SETTINGS = [
+  {k:"squelch", off:0,  label:"Squelch level", type:"range", min:0, max:9},
+  {k:"step",    off:1,  label:"Frequency step", type:"enum",
+     opts:["2.5 kHz","5.0 kHz","6.25 kHz","10.0 kHz","12.5 kHz","25.0 kHz"]},
+  {k:"save",    off:3,  label:"Battery saver", type:"enum", opts:["Off","1:1","1:2","1:3","1:4"]},
+  {k:"vox",     off:4,  label:"VOX level", type:"range", min:0, max:10},
+  {k:"abr",     off:6,  label:"Backlight seconds", type:"range", min:0, max:24},
+  {k:"tdr",     off:7,  label:"Dual watch", type:"enum", opts:["Off","On"]},
+  {k:"beep",    off:8,  label:"Key beep", type:"enum", opts:["Off","On"]},
+  {k:"timeout", off:9,  label:"Transmit timer", type:"enum",
+     opts:["15 s","30 s","45 s","60 s","75 s","90 s","105 s","120 s","135 s","150 s"]},
+  {k:"voice",   off:14, label:"Voice prompt", type:"enum", opts:["Off","English","Chinese"]},
+  {k:"dtmfst",  off:16, label:"DTMF side tone", type:"enum",
+     opts:["Off","DT side tone","ANI side tone","Both"]},
+  {k:"screv",   off:18, label:"Scan resume", type:"bits", mask:0x03, shift:0,
+     opts:["Time","Carrier","Search"]},
+  {k:"pttid",   off:19, label:"PTT-ID default", type:"enum", opts:["Off","Begin","End","Both"]},
+  {k:"pttlt",   off:20, label:"PTT-ID delay", type:"range", min:0, max:30},
+  {k:"mdfa",    off:21, label:"Display, band A", type:"enum", opts:["Frequency","Channel","Name"]},
+  {k:"mdfb",    off:22, label:"Display, band B", type:"enum", opts:["Frequency","Channel","Name"]},
+  {k:"bcl",     off:23, label:"Busy lockout, global", type:"enum", opts:["Off","On"]},
+  {k:"autolk",  off:24, label:"Automatic keypad lock", type:"enum", opts:["Off","On"]},
+  {k:"wtled",   off:29, label:"Standby backlight", type:"enum", opts:["Off","Blue","Orange","Purple"]},
+  {k:"rxled",   off:30, label:"Receive backlight", type:"enum", opts:["Off","Blue","Orange","Purple"]},
+  {k:"txled",   off:31, label:"Transmit backlight", type:"enum", opts:["Off","Blue","Orange","Purple"]},
+  {k:"almod",   off:32, label:"Alarm mode", type:"enum", opts:["Site","Tone","Code"]},
+  {k:"ste",     off:35, label:"Squelch tail eliminate", type:"enum", opts:["Off","On"]},
+  {k:"rpste",   off:36, label:"Repeater tail eliminate", type:"range", min:0, max:10},
+  {k:"rptrl",   off:37, label:"Repeater tail delay", type:"range", min:0, max:10},
+  {k:"ponmsg",  off:38, label:"Power on message", type:"enum", opts:["Full","Message","Battery voltage"]},
+  {k:"roger",   off:39, label:"Roger beep", type:"enum", opts:["Off","On"]},
+];
+
+/* ================= codecs ================= */
+function bcdToHz(b){
+  let s = "";
+  for (let i = 3; i >= 0; i--){
+    const hi = (b[i] >> 4) & 0xF, lo = b[i] & 0xF;
+    if (hi > 9 || lo > 9) return null;
+    s += String(hi) + String(lo);
+  }
+  return parseInt(s, 10) * 10;
+}
+function hzToBcd(hz){
+  const s = String(Math.round(hz / 10)).padStart(8, "0").slice(-8);
+  const out = new Uint8Array(4);
+  for (let i = 0; i < 4; i++){
+    out[i] = ((s.charCodeAt(6 - 2*i) - 48) << 4) | (s.charCodeAt(7 - 2*i) - 48);
+  }
+  return out;
+}
+function decodeTone(v){
+  if (v === 0 || v === 0xFFFF) return {kind:"none"};
+  if (v >= 0x2800){
+    return {kind:"dcs", code: parseInt((v & 0x07FF).toString(8), 10), pol:(v & 0x8000) ? "R" : "N"};
+  }
+  return {kind:"ctcss", freq: v / 10};
+}
+function encodeTone(t){
+  if (!t || t.kind === "none") return 0xFFFF;
+  if (t.kind === "ctcss") return Math.round(t.freq * 10) & 0xFFFF;
+  let v = parseInt(String(t.code), 8) + 0x2800;
+  if (t.pol === "R") v += 0xA000;
+  return v & 0xFFFF;
+}
+const toneLabel = t => t.kind === "none" ? "" :
+  t.kind === "ctcss" ? t.freq.toFixed(1) : "D" + String(t.code).padStart(3,"0") + t.pol;
+const toneToValue = toneLabel;
+function toneFromValue(v){
+  if (v === "") return {kind:"none"};
+  if (v[0] === "D") return {kind:"dcs", code: parseInt(v.slice(1,4),10), pol: v[4]};
+  return {kind:"ctcss", freq: parseFloat(v)};
+}
+function decodeName(bytes){
+  let s = "";
+  for (const b of bytes){ if (b === 0xFF || b === 0x00) break; s += String.fromCharCode(b); }
+  return s.trim();
+}
+function encodeName(str){
+  const out = new Uint8Array(7).fill(0xFF);
+  const s = (str || "").toUpperCase().slice(0, 7);
+  for (let i = 0; i < s.length; i++){
+    out[i] = (NAME_CHARS.includes(s[i]) ? s[i] : " ").charCodeAt(0);
+  }
+  return out;
+}
+function decodeDtmf(bytes){
+  let s = "";
+  for (const b of bytes){ if (b >= DTMF_CHARS.length) break; s += DTMF_CHARS[b]; }
+  return s;
+}
+function encodeDtmf(str, len){
+  const out = new Uint8Array(len).fill(0xFF);
+  const s = (str || "").toUpperCase().slice(0, len);
+  for (let i = 0; i < s.length; i++){
+    const ix = DTMF_CHARS.indexOf(s[i]);
+    if (ix < 0) continue;
+    out[i] = ix;
+  }
+  return out;
+}
+// FM preset word: tenths of a MHz above 65.0, 0xFFFF empty
+function decodeFm(v){
+  if (v === 0xFFFF || v > 500) return null;
+  return 65 + v / 10;
+}
+function encodeFm(mhz){
+  if (mhz === null || !isFinite(mhz)) return 0xFFFF;
+  return Math.round((mhz - 65) * 10) & 0xFFFF;
+}
+const fmtMHz = hz => (hz / 1e6).toFixed(5);
+const hex = a => Array.from(a).map(b => b.toString(16).padStart(2,"0")).join(" ");
+
+/* ================= state ================= */
+let img = null;          // working image
+let ref = null;          // reference image, from the last read or open
+let cmp = null;          // comparison image loaded from file
+let identBytes = null;
+let sel = -1;
+let usedOnly = false;
+const undoStack = [], redoStack = [];
+const UNDO_MAX = 60;
+
+function pushUndo(label){
+  if (!img) return;
+  undoStack.push({label, snap: img.slice(0)});
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+  refreshUndo();
+}
+function refreshUndo(){
+  const u = $("btnUndo"), r = $("btnRedo");
+  u.disabled = undoStack.length === 0;
+  r.disabled = redoStack.length === 0;
+  u.title = undoStack.length ? "Undo " + undoStack[undoStack.length-1].label : "";
+  r.title = redoStack.length ? "Redo " + redoStack[redoStack.length-1].label : "";
+  refreshDirty();
+}
+function undo(){
+  if (!undoStack.length) return;
+  const e = undoStack.pop();
+  redoStack.push({label: e.label, snap: img.slice(0)});
+  img = e.snap;
+  log("Undo: " + e.label);
+  refreshUndo(); renderAll();
+}
+function redo(){
+  if (!redoStack.length) return;
+  const e = redoStack.pop();
+  undoStack.push({label: e.label, snap: img.slice(0)});
+  img = e.snap;
+  log("Redo: " + e.label);
+  refreshUndo(); renderAll();
+}
+
+/* ================= channels ================= */
+const chOffset = n => MAP.channels.base + n * CH_LEN;
+const nameOffset = n => MAP.names.base + n * CH_LEN;
+
+function readChannel(n){
+  const o = chOffset(n);
+  const raw = img.slice(o, o + CH_LEN);
+  const rx = bcdToHz(raw.subarray(0,4));
+  const used = rx !== null && rx > 0 && raw[0] !== 0xFF;
+  const tx = bcdToHz(raw.subarray(4,8));
+  const b15 = raw[15];
+  return {
+    n, used, raw,
+    rxHz: used ? rx : 0,
+    txHz: tx === null ? 0 : tx,
+    rxTone: decodeTone(raw[8] | (raw[9] << 8)),
+    txTone: decodeTone(raw[10] | (raw[11] << 8)),
+    scode: raw[12] & 0x0F,
+    power: raw[14] & 0x03,
+    wide: (b15 >> 6) & 1,
+    bcl: (b15 >> 3) & 1,
+    scan: (b15 >> 2) & 1,
+    pttid: b15 & 0x03,
+    name: decodeName(img.subarray(nameOffset(n), nameOffset(n) + 7)),
+  };
+}
+function writeChannel(n, c){
+  const o = chOffset(n);
+  const old = img.slice(o, o + CH_LEN);
+  const b = new Uint8Array(CH_LEN);
+  const wasBlank = old[0] === 0xFF && old[15] === 0xFF;
+  if (wasBlank){ b.fill(0x00); b[15] = 0x40; } else b.set(old);
+  b.set(hzToBcd(c.rxHz), 0);
+  b.set(hzToBcd(c.txHz || c.rxHz), 4);
+  const rt = encodeTone(c.rxTone), tt = encodeTone(c.txTone);
+  b[8] = rt & 0xFF; b[9] = rt >> 8; b[10] = tt & 0xFF; b[11] = tt >> 8;
+  b[12] = (b[12] & 0xF0) | (c.scode & 0x0F);
+  b[14] = (b[14] & 0xFC) | (c.power & 0x03);
+  b[15] = (b[15] & 0x30) | ((c.wide & 1) << 6) | ((c.bcl & 1) << 3) | ((c.scan & 1) << 2) | (c.pttid & 3);
+  img.set(b, o);
+  img.set(encodeName(c.name), nameOffset(n));
+  for (let i = 7; i < 16; i++) img[nameOffset(n) + i] = 0xFF;
+}
+function clearChannel(n){
+  img.fill(0xFF, chOffset(n), chOffset(n) + CH_LEN);
+  img.fill(0xFF, nameOffset(n), nameOffset(n) + CH_LEN);
+}
+function duplexOf(c){
+  if (!c.used) return {kind:"", off:0};
+  if (c.txHz === 0) return {kind:"off", off:0};
+  if (c.txHz === c.rxHz) return {kind:"", off:0};
+  const d = c.txHz - c.rxHz;
+  if (Math.abs(d) < 20e6) return {kind: d > 0 ? "+" : "-", off: Math.abs(d)};
+  return {kind:"split", off: c.txHz};
+}
+const defaultOffset = hz =>
+  (hz >= 136e6 && hz < 175e6) ? 600000 : (hz >= 400e6 && hz < 520e6) ? 5000000 : 0;
+const inBand = hz => (hz >= 136e6 && hz <= 174e6) || (hz >= 400e6 && hz <= 520e6);
+
+/* ================= settings, dtmf, fm ================= */
+const getByte = off => img[off];
+function readSetting(f){
+  const v = img[MAP.settings.base + f.off];
+  if (v === undefined) return 0;
+  if (f.type === "bits") return (v & f.mask) >> f.shift;
+  return v === 0xFF ? 0 : v;
+}
+function writeSetting(f, val){
+  const o = MAP.settings.base + f.off;
+  if (f.type === "bits"){
+    const cur = img[o] === 0xFF ? 0 : img[o];
+    img[o] = (cur & ~f.mask) | ((val << f.shift) & f.mask);
+  } else img[o] = val & 0xFF;
+}
+const aniOff = () => MAP.ani.base;
+const scodeOff = i => MAP.scode.base + i * 16;
+const fmOff = i => MAP.fm.base + i * 2;
+function readFm(i){
+  const o = fmOff(i);
+  return decodeFm(img[o] | (img[o+1] << 8));
+}
+function writeFm(i, mhz){
+  const v = encodeFm(mhz);
+  const o = fmOff(i);
+  img[o] = v & 0xFF; img[o+1] = (v >> 8) & 0xFF;
+}
+
+/* ================= dirty tracking ================= */
+function writable(off){ return RANGES_FULL.some(([s,e]) => off >= s && off < e); }
+function regionOf(off){
+  for (const [k, r] of Object.entries(MAP)){
+    if (off >= r.base && off < r.base + r.span) return k;
+  }
+  return null;
+}
+function dirtyBlocks(){
+  const out = [];
+  if (!img || !ref) return out;
+  for (let o = MAIN_START; o < MAIN_END; o += 16){
+    let diff = false;
+    for (let i = 0; i < 16; i++) if (img[o+i] !== ref[o+i]) { diff = true; break; }
+    if (diff) out.push(o);
+  }
+  return out;
+}
+function refreshDirty(){
+  const d = dirtyBlocks();
+  const el = $("dirtyStatus");
+  if (!img){ el.innerHTML = "Changes: <b>no image</b>"; return; }
+  if (!ref){ el.innerHTML = "Changes: <b>no reference to compare</b>"; return; }
+  el.innerHTML = "Changes: <b>" + d.length + " block" + (d.length === 1 ? "" : "s") + "</b>";
+}
+
+/* ================= serial ================= */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+class Link {
+  constructor(){ this.port = null; this.buf = []; this.reader = null; this.open = false; }
+  async connect(){
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({baudRate:9600, dataBits:8, stopBits:1, parity:"none", flowControl:"none"});
+    this.open = true;
+    this.pump();
+  }
+  async pump(){
+    try{
+      this.reader = this.port.readable.getReader();
+      for(;;){
+        const {value, done} = await this.reader.read();
+        if (done) break;
+        if (value) for (const b of value) this.buf.push(b);
+      }
+    } catch(e){ if (this.open) log("Read pump stopped: " + e.message, "err"); }
+    finally { try { this.reader.releaseLock(); } catch(_){} }
+  }
+  async disconnect(){
+    this.open = false;
+    try { await this.reader?.cancel(); } catch(_){}
+    try { await this.port?.close(); } catch(_){}
+    this.port = null; this.buf = [];
+  }
+  flush(){ this.buf.length = 0; }
+  async send(bytes, perByteMs = 0){
+    const w = this.port.writable.getWriter();
+    try{
+      if (perByteMs){ for (const b of bytes){ await w.write(new Uint8Array([b])); await sleep(perByteMs); } }
+      else await w.write(new Uint8Array(bytes));
+    } finally { w.releaseLock(); }
+    if ($("dbg").checked) log("TX " + hex(bytes));
+  }
+  async recv(n, timeout = 1200){
+    const t0 = performance.now();
+    while (this.buf.length < n){
+      if (performance.now() - t0 > timeout)
+        throw new Error("Timed out waiting for " + n + " bytes, got " + this.buf.length);
+      await sleep(4);
+    }
+    const out = this.buf.splice(0, n);
+    if ($("dbg").checked) log("RX " + hex(out));
+    return out;
+  }
+}
+const link = new Link();
+
+async function handshake(){
+  for (const [label, magic] of MAGICS){
+    link.flush();
+    try{
+      await link.send(magic, 8);
+      const ack = await link.recv(1, 700);
+      if (ack[0] !== 0x06) throw new Error("no ack");
+      await link.send([0x02]);
+      const id = await link.recv(8, 900);
+      await link.send([0x06]);
+      const ack2 = await link.recv(1, 900);
+      if (ack2[0] !== 0x06) throw new Error("clone refused");
+      log("Handshake accepted: " + label, "ok");
+      return new Uint8Array(id);
+    } catch(e){
+      log("Handshake declined for " + label + ", " + e.message);
+      await sleep(120);
+    }
+  }
+  throw new Error("No response from the radio. Check the cable, the volume, and that the radio is on.");
+}
+async function readBlock(addr, size){
+  await link.send([0x53, (addr >> 8) & 0xFF, addr & 0xFF, size]);
+  const hdr = await link.recv(4, 1500);
+  if (hdr[0] !== 0x58) throw new Error("Bad block header at 0x" + addr.toString(16));
+  const data = await link.recv(size, 2000);
+  await link.send([0x06]);
+  const ack = await link.recv(1, 900);
+  if (ack[0] !== 0x06) throw new Error("Block not acknowledged at 0x" + addr.toString(16));
+  return data;
+}
+async function writeBlock(addr, data){
+  await link.send([0x58, (addr >> 8) & 0xFF, addr & 0xFF, data.length, ...data]);
+  const ack = await link.recv(1, 1500);
+  if (ack[0] !== 0x06) throw new Error("Write not acknowledged at 0x" + addr.toString(16));
+}
+async function readRadio(){
+  const buf = new Uint8Array(IMG_SIZE).fill(0xFF);
+  identBytes = await handshake();
+  buf.set(identBytes, 0);
+  const total = 0x1800 + AUX_LEN;
+  let done = 0;
+  for (let a = 0; a < 0x1800; a += 0x40){
+    buf.set(await readBlock(a, 0x40), MAIN_START + a);
+    done += 0x40; setBar(done/total);
+  }
+  for (let a = AUX_RADIO; a < AUX_RADIO + AUX_LEN; a += 0x40){
+    buf.set(await readBlock(a, 0x40), AUX_IMG + (a - AUX_RADIO));
+    done += 0x40; setBar(done/total);
+  }
+  return buf;
+}
+async function writeRadio(offsets){
+  identBytes = await handshake();
+  let done = 0;
+  for (const off of offsets){
+    await writeBlock(off - IDENT_LEN, img.slice(off, off + 16));
+    done++; setBar(done / offsets.length);
+    await sleep(2);
+  }
+}
+function plannedBlocks(scope){
+  let list = [];
+  if (scope === "dirty") list = dirtyBlocks();
+  else {
+    const ranges = scope === "channels" ? RANGES_CHANNELS : RANGES_FULL;
+    for (const [s,e] of ranges) for (let o = s; o < e; o += 16) list.push(o);
+  }
+  return list.filter(writable);
+}
+
+/* ================= ui plumbing ================= */
+const $ = id => document.getElementById(id);
+function log(msg, cls){
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = new Date().toTimeString().slice(0,8) + "  " + msg;
+  $("log").appendChild(line);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+const setBar = f => { $("bar").style.width = Math.max(0, Math.min(1, f)) * 100 + "%"; };
+
+function fillToneSelect(el){
+  el.innerHTML = "";
+  const add = (v,t) => { const o = document.createElement("option"); o.value = v; o.textContent = t; el.appendChild(o); };
+  add("", "None");
+  for (const f of CTCSS) add(f.toFixed(1), f.toFixed(1) + " Hz");
+  for (const c of DCS){
+    const s = String(c).padStart(3,"0");
+    add("D"+s+"N", "D"+s+" N"); add("D"+s+"R", "D"+s+" R");
+  }
+}
+fillToneSelect($("fTxTone")); fillToneSelect($("fRxTone"));
+(function(){
+  const el = $("fScode");
+  for (let i = 0; i < 16; i++){
+    const o = document.createElement("option");
+    o.value = String(i); o.textContent = i === 0 ? "None" : "Code " + i;
+    el.appendChild(o);
+  }
+})();
+
+function renderAll(){
+  renderTable();
+  renderSettings();
+  renderDtmf();
+  renderFm();
+  renderMap();
+  renderHex();
+  if (sel >= 0 && img) selectChannel(sel, true);
+  refreshDirty();
+}
+
+/* -------- channels -------- */
+function renderTable(){
+  const tb = $("tbody");
+  tb.innerHTML = "";
+  if (!img){ $("countStatus").textContent = "No image loaded"; return; }
+  let used = 0;
+  for (let n = 0; n < CH_COUNT; n++){
+    const c = readChannel(n);
+    if (c.used) used++;
+    if (usedOnly && !c.used) continue;
+    const d = duplexOf(c);
+    const tr = document.createElement("tr");
+    tr.className = "pick" + (c.used ? "" : " empty");
+    tr.setAttribute("aria-selected", n === sel ? "true" : "false");
+    tr.innerHTML =
+      '<td class="num">' + String(n).padStart(3,"0") + "</td>" +
+      "<td>" + (c.used ? (c.name || "") : "") + "</td>" +
+      "<td>" + (c.used ? fmtMHz(c.rxHz) : "empty") + "</td>" +
+      "<td>" + (c.used ? (d.kind || "") : "") + "</td>" +
+      "<td>" + (c.used && d.kind && d.kind !== "off" ? fmtMHz(d.off) : "") + "</td>" +
+      "<td>" + (c.used ? toneLabel(c.txTone) : "") + "</td>" +
+      "<td>" + (c.used ? toneLabel(c.rxTone) : "") + "</td>" +
+      "<td>" + (c.used ? (c.wide ? "W" : "N") : "") + "</td>" +
+      "<td>" + (c.used ? (c.power ? "Low" : "High") : "") + "</td>" +
+      "<td>" + (c.used && c.scan ? "yes" : "") + "</td>" +
+      "<td>" + (c.used && c.scode ? c.scode : "") + "</td>";
+    tr.addEventListener("click", () => selectChannel(n));
+    tb.appendChild(tr);
+  }
+  $("countStatus").textContent = used + " of 128 channels in use";
+  $("btnSaveImg").disabled = false;
+  $("btnExportCsv").disabled = false;
+}
+function selectChannel(n, keepScroll){
+  sel = n;
+  const c = readChannel(n);
+  $("editor").disabled = false;
+  $("btnClearCh").disabled = false;
+  $("btnCopyCh").disabled = false;
+  $("fName").value = c.used ? c.name : "";
+  $("fRx").value = c.used ? fmtMHz(c.rxHz) : "";
+  const d = duplexOf(c);
+  $("fDup").value = d.kind === "split" ? "split" : d.kind;
+  $("fOff").value = d.kind === "split" ? fmtMHz(c.txHz) : (d.kind && d.kind !== "off" ? fmtMHz(d.off) : "");
+  $("fTxTone").value = toneToValue(c.txTone);
+  $("fRxTone").value = toneToValue(c.rxTone);
+  $("fMode").value = String(c.wide);
+  $("fPower").value = String(c.power > 1 ? 1 : c.power);
+  $("fPttid").value = String(c.pttid);
+  $("fScode").value = String(c.scode);
+  $("fScan").checked = !!c.scan;
+  $("fBcl").checked = !!c.bcl;
+  $("hexStrip").textContent = "raw " + String(n).padStart(3,"0") + " @ 0x" +
+    chOffset(n).toString(16).padStart(4,"0") + "   " + hex(c.raw);
+  if (!keepScroll) renderTable();
+  renderLcd(c);
+  checkBand(c.used ? c.rxHz : 0, c.txHz);
+}
+function renderLcd(c){
+  const d = duplexOf(c);
+  $("lcdCh").textContent = "CH " + String(c.n).padStart(3,"0");
+  $("lcdDup").textContent = !c.used ? "" : d.kind === "+" ? "DUP +" : d.kind === "-" ? "DUP -" :
+    d.kind === "split" ? "SPLIT" : d.kind === "off" ? "TX OFF" : "SIMPLEX";
+  $("lcdName").textContent = c.used ? (c.name || "\u00a0") : "\u00a0";
+  $("lcdFreq").textContent = c.used ? fmtMHz(c.rxHz) : "---.-----";
+  $("lcdTx").textContent = c.used ? "TX " + fmtMHz(c.txHz || c.rxHz) : "TX ---.-----";
+  $("lcdTone").textContent = c.used ? (toneLabel(c.txTone) || "\u00a0") : "\u00a0";
+  $("icoTone").className = c.used && c.txTone.kind !== "none" ? "on" : "";
+  $("icoScan").className = c.used && c.scan ? "on" : "";
+  $("icoBcl").className = c.used && c.bcl ? "on" : "";
+  $("icoLow").className = c.used && c.power ? "on" : "";
+  $("icoNar").className = c.used && !c.wide ? "on" : "";
+}
+function checkBand(rx, tx){
+  const w = $("bandWarn");
+  const bad = [];
+  if (rx && !inBand(rx)) bad.push("receive " + fmtMHz(rx) + " MHz");
+  if (tx && !inBand(tx)) bad.push("transmit " + fmtMHz(tx) + " MHz");
+  if (bad.length){
+    w.textContent = "Outside the rated bands, 136 to 174 and 400 to 520 MHz: " + bad.join(", ") +
+      ". The radio may refuse it, and transmit privileges are yours to verify.";
+    w.classList.remove("hidden");
+  } else w.classList.add("hidden");
+}
+function applyEdit(){
+  if (sel < 0 || !img) return;
+  const rx = parseFloat($("fRx").value);
+  if (!isFinite(rx) || rx <= 0){ log("Receive frequency is not valid", "err"); return; }
+  const rxHz = Math.round(rx * 1e6);
+  const dup = $("fDup").value;
+  const raw = parseFloat($("fOff").value);
+  let txHz = rxHz;
+  if (dup === "+" || dup === "-"){
+    const off = isFinite(raw) && raw > 0 ? Math.round(raw * 1e6) : defaultOffset(rxHz);
+    txHz = dup === "+" ? rxHz + off : rxHz - off;
+  } else if (dup === "split"){
+    if (!isFinite(raw) || raw <= 0){ log("Split needs a transmit frequency", "err"); return; }
+    txHz = Math.round(raw * 1e6);
+  } else if (dup === "off") txHz = 0;
+
+  pushUndo("channel " + String(sel).padStart(3,"0"));
+  writeChannel(sel, {
+    rxHz, txHz,
+    txTone: toneFromValue($("fTxTone").value),
+    rxTone: toneFromValue($("fRxTone").value),
+    power: parseInt($("fPower").value,10),
+    wide: parseInt($("fMode").value,10),
+    scan: $("fScan").checked ? 1 : 0,
+    bcl: $("fBcl").checked ? 1 : 0,
+    pttid: parseInt($("fPttid").value,10),
+    scode: parseInt($("fScode").value,10),
+    name: $("fName").value,
+  });
+  log("Channel " + String(sel).padStart(3,"0") + " updated", "ok");
+  renderAll();
+}
+
+/* -------- settings -------- */
+function regionBanner(key, el){
+  const r = MAP[key];
+  const at = "0x" + r.base.toString(16).toUpperCase();
+  const guarded = !writable(r.base) || !writable(r.base + r.span - 1);
+  el.classList.toggle("bad", !r.verified || guarded);
+  if (guarded){
+    el.textContent = r.label + " at " + at + " falls inside a protected range that is never written, " +
+      "0x0CF8 to 0x0D08 or 0x0DF8 to 0x0E30. Reading works, but edits here will never reach the radio, " +
+      "which is a strong hint the offset is wrong. Find it with the Map and diff tab.";
+  } else if (!r.verified){
+    el.textContent = r.label + " sits at an unconfirmed offset, " + at +
+      ". Reading is harmless. Confirm the offset with the diff tool before writing these blocks to a radio.";
+  } else {
+    el.textContent = r.label + " is marked verified at image offset " + at + ".";
+  }
+}
+function overlaps(){
+  const ks = Object.keys(MAP), bad = [];
+  for (let i = 0; i < ks.length; i++){
+    for (let j = i + 1; j < ks.length; j++){
+      const a = MAP[ks[i]], b = MAP[ks[j]];
+      if (a.base < b.base + b.span && b.base < a.base + a.span) bad.push([ks[i], ks[j]]);
+    }
+  }
+  return bad;
+}
+function renderSettings(){
+  const g = $("setGrid");
+  g.innerHTML = "";
+  regionBanner("settings", $("setWarn"));
+  if (!img) return;
+  for (const f of SETTINGS){
+    const d = document.createElement("div");
+    d.className = "field" + (MAP.settings.verified ? "" : " unver");
+    const id = "set_" + f.k;
+    const val = readSetting(f);
+    let ctl;
+    if (f.type === "enum" || f.type === "bits"){
+      ctl = '<select id="' + id + '">' + f.opts.map((o,i) =>
+        '<option value="' + i + '"' + (i === val ? " selected" : "") + ">" + o + "</option>").join("") +
+        (val >= f.opts.length ? '<option value="' + val + '" selected>Unknown, ' + val + "</option>" : "") +
+        "</select>";
+    } else {
+      ctl = '<input id="' + id + '" type="number" min="' + f.min + '" max="' + f.max + '" value="' + val + '">';
+    }
+    d.innerHTML = '<label for="' + id + '">' + f.label + "</label>" + ctl;
+    g.appendChild(d);
+  }
+}
+function applySettings(){
+  if (!img) return;
+  pushUndo("radio settings");
+  for (const f of SETTINGS){
+    const el = $("set_" + f.k);
+    if (!el) continue;
+    let v = parseInt(el.value, 10);
+    if (!isFinite(v)) v = 0;
+    if (f.type === "range") v = Math.max(f.min, Math.min(f.max, v));
+    writeSetting(f, v);
+  }
+  log("Settings written to the working image", "ok");
+  renderAll();
+}
+
+/* -------- dtmf -------- */
+function renderDtmf(){
+  regionBanner("ani", $("dtmfWarn"));
+  const g = $("dtmfGrid");
+  g.innerHTML = "";
+  if (!img) return;
+  $("fAni").value = decodeDtmf(img.subarray(aniOff(), aniOff() + 5));
+  const on = img[aniOff() + 10], off = img[aniOff() + 11];
+  $("fDtmfOn").value = on === 0xFF ? "" : on;
+  $("fDtmfOff").value = off === 0xFF ? "" : off;
+  for (let i = 0; i < 15; i++){
+    const d = document.createElement("div");
+    d.className = "field" + (MAP.scode.verified ? "" : " unver");
+    const id = "sc_" + i;
+    const code = decodeDtmf(img.subarray(scodeOff(i), scodeOff(i) + 5));
+    d.innerHTML = '<label for="' + id + '">Code ' + (i+1) + "</label>" +
+      '<input id="' + id + '" maxlength="5" value="' + code + '" autocomplete="off">';
+    g.appendChild(d);
+  }
+}
+function applyDtmf(){
+  if (!img) return;
+  pushUndo("DTMF codes");
+  img.set(encodeDtmf($("fAni").value, 5), aniOff());
+  const on = parseInt($("fDtmfOn").value, 10), off = parseInt($("fDtmfOff").value, 10);
+  if (isFinite(on)) img[aniOff() + 10] = on & 0xFF;
+  if (isFinite(off)) img[aniOff() + 11] = off & 0xFF;
+  for (let i = 0; i < 15; i++){
+    img.set(encodeDtmf($("sc_" + i).value, 5), scodeOff(i));
+  }
+  log("DTMF codes written to the working image", "ok");
+  renderAll();
+}
+
+/* -------- fm -------- */
+function renderFm(){
+  regionBanner("fm", $("fmWarn"));
+  const g = $("fmGrid");
+  g.innerHTML = "";
+  if (!img) return;
+  for (let i = 0; i < 25; i++){
+    const v = readFm(i);
+    const d = document.createElement("div");
+    d.className = "field" + (MAP.fm.verified ? "" : " unver");
+    const id = "fm_" + i;
+    d.innerHTML = '<label for="' + id + '">Preset ' + (i+1) + "</label>" +
+      '<input id="' + id + '" inputmode="decimal" value="' + (v === null ? "" : v.toFixed(1)) + '">';
+    g.appendChild(d);
+  }
+}
+function applyFm(){
+  if (!img) return;
+  pushUndo("FM presets");
+  for (let i = 0; i < 25; i++){
+    const raw = $("fm_" + i).value.trim();
+    if (raw === ""){ writeFm(i, null); continue; }
+    const v = parseFloat(raw);
+    if (!isFinite(v) || v < 65 || v > 108){
+      log("Preset " + (i+1) + " is outside 65.0 to 108.0 MHz, left empty", "err");
+      writeFm(i, null);
+      continue;
+    }
+    writeFm(i, v);
+  }
+  log("FM presets written to the working image", "ok");
+  renderAll();
+}
+
+/* -------- map and diff -------- */
+function renderMap(){
+  const tb = $("mapBody");
+  tb.innerHTML = "";
+  for (const [k, r] of Object.entries(MAP)){
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      "<td>" + r.label + "</td>" +
+      '<td><input id="map_' + k + '" value="' + r.base.toString(16).toUpperCase().padStart(4,"0") + '" style="width:7em"></td>' +
+      "<td>0x" + (r.base - IDENT_LEN).toString(16).toUpperCase().padStart(4,"0") + "</td>" +
+      "<td>" + r.span + " bytes</td>" +
+      '<td><input type="checkbox" id="ver_' + k + '"' + (r.verified ? " checked" : "") + "></td>";
+    tb.appendChild(tr);
+  }
+}
+function applyMap(){
+  for (const k of Object.keys(MAP)){
+    const v = parseInt($("map_" + k).value.replace(/^0x/i, ""), 16);
+    if (isFinite(v) && v >= 0 && v + MAP[k].span <= IMG_SIZE) MAP[k].base = v;
+    else log("Offset for " + MAP[k].label + " is out of range, keeping 0x" + MAP[k].base.toString(16), "err");
+    MAP[k].verified = $("ver_" + k).checked;
+  }
+  for (const [a, b] of overlaps())
+    log("Regions overlap: " + MAP[a].label + " and " + MAP[b].label + ". One of them is wrong.", "err");
+  try { localStorage.setItem("clarion.map", JSON.stringify(MAP)); } catch(_){}
+  log("Memory map updated", "ok");
+  renderAll();
+}
+function renderDiff(other, label){
+  const tb = $("diffBody");
+  tb.innerHTML = "";
+  if (!img || !other){
+    tb.innerHTML = '<tr><td colspan="5">Nothing to compare</td></tr>';
+    return;
+  }
+  let rows = 0;
+  for (let o = 0; o < IMG_SIZE; o += 16){
+    let diff = false;
+    for (let i = 0; i < 16; i++) if (img[o+i] !== other[o+i]) { diff = true; break; }
+    if (!diff) continue;
+    rows++;
+    if (rows > 96) break;
+    const k = regionOf(o);
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="num">0x' + o.toString(16).toUpperCase().padStart(4,"0") + "</td>" +
+      "<td>0x" + (o - IDENT_LEN).toString(16).toUpperCase().padStart(4,"0") + "</td>" +
+      "<td>" + (k ? MAP[k].label : "unmapped") + "</td>" +
+      '<td class="hex">' + hex(other.slice(o, o+16)) + "</td>" +
+      '<td class="hex">' + hex(img.slice(o, o+16)) + "</td>";
+    tb.appendChild(tr);
+  }
+  if (!rows) tb.innerHTML = '<tr><td colspan="5">Identical</td></tr>';
+  log("Compared against " + label + ", " + rows + " block" + (rows === 1 ? "" : "s") + " differ");
+}
+
+/* -------- hex editor -------- */
+let hexBase = 0x0E20;
+function renderHex(){
+  const p = $("hexPane");
+  p.innerHTML = "";
+  if (!img) return;
+  for (let r = 0; r < 8; r++){
+    const o = hexBase + r * 16;
+    if (o + 16 > IMG_SIZE) break;
+    const row = document.createElement("div");
+    row.className = "hexrow";
+    const ascii = Array.from(img.slice(o, o+16))
+      .map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : ".").join("");
+    row.innerHTML =
+      '<span class="addr">0x' + o.toString(16).toUpperCase().padStart(4,"0") + "</span>" +
+      '<input id="hx_' + r + '" data-off="' + o + '" value="' + hex(img.slice(o, o+16)) + '">' +
+      '<span class="ascii">' + ascii + "</span>";
+    p.appendChild(row);
+  }
+}
+function applyHex(){
+  if (!img) return;
+  pushUndo("hex edit at 0x" + hexBase.toString(16));
+  let changed = 0;
+  for (let r = 0; r < 8; r++){
+    const el = $("hx_" + r);
+    if (!el) continue;
+    const off = parseInt(el.dataset.off, 10);
+    const parts = el.value.trim().split(/\s+/);
+    if (parts.length !== 16){ log("Row at 0x" + off.toString(16) + " needs exactly 16 bytes", "err"); continue; }
+    for (let i = 0; i < 16; i++){
+      const b = parseInt(parts[i], 16);
+      if (!isFinite(b) || b < 0 || b > 255){ log("Bad byte in row 0x" + off.toString(16), "err"); return; }
+      if (img[off+i] !== b) changed++;
+      img[off+i] = b;
+    }
+  }
+  log("Hex edit applied, " + changed + " byte" + (changed === 1 ? "" : "s") + " changed", "ok");
+  renderAll();
+}
+
+/* ================= csv ================= */
+const CSV_COLS = ["Location","Name","Frequency","Duplex","Offset","Tone","rToneFreq","cToneFreq",
+  "DtcsCode","DtcsPolarity","Mode","TStep","Skip","Power","Comment"];
+function exportCsv(){
+  const rows = [CSV_COLS.join(",")];
+  for (let n = 0; n < CH_COUNT; n++){
+    const c = readChannel(n);
+    if (!c.used) continue;
+    const d = duplexOf(c), tx = c.txTone, rx = c.rxTone;
+    let tone = "", rTone = "88.5", cTone = "88.5", dcode = "023", dpol = "NN";
+    if (tx.kind === "ctcss" && rx.kind === "ctcss"){ tone = "TSQL"; rTone = tx.freq.toFixed(1); cTone = rx.freq.toFixed(1); }
+    else if (tx.kind === "ctcss"){ tone = "Tone"; rTone = tx.freq.toFixed(1); }
+    else if (tx.kind === "dcs"){ tone = "DTCS"; dcode = String(tx.code).padStart(3,"0");
+      dpol = tx.pol + (rx.kind === "dcs" ? rx.pol : "N"); }
+    rows.push([
+      n, c.name, fmtMHz(c.rxHz),
+      d.kind === "off" ? "off" : d.kind,
+      d.kind === "split" ? fmtMHz(c.txHz) : fmtMHz(d.off),
+      tone, rTone, cTone, dcode, dpol,
+      c.wide ? "FM" : "NFM", "5.00", c.scan ? "" : "S",
+      c.power ? "Low" : "High", ""
+    ].map(v => String(v).includes(",") ? '"'+v+'"' : v).join(","));
+  }
+  download(new Blob([rows.join("\n")], {type:"text/csv"}), "clarion-uv5r.csv");
+  log("CSV exported", "ok");
+}
+function parseCsvLine(line){
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (q){
+      if (ch === '"' && line[i+1] === '"'){ cur += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ","){ out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+function importCsv(text){
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+  if (!lines.length) return;
+  const head = parseCsvLine(lines[0]).map(h => h.trim());
+  const ix = n => head.indexOf(n);
+  pushUndo("CSV import");
+  let count = 0;
+  for (let i = 1; i < lines.length; i++){
+    const f = parseCsvLine(lines[i]);
+    const g = n => { const k = ix(n); return k >= 0 ? (f[k] || "").trim() : ""; };
+    const loc = parseInt(g("Location"), 10), freq = parseFloat(g("Frequency"));
+    if (!isFinite(loc) || loc < 0 || loc >= CH_COUNT || !isFinite(freq)) continue;
+    const rxHz = Math.round(freq * 1e6);
+    const dup = g("Duplex");
+    const off = Math.round((parseFloat(g("Offset")) || 0) * 1e6);
+    let txHz = rxHz;
+    if (dup === "+") txHz = rxHz + (off || defaultOffset(rxHz));
+    else if (dup === "-") txHz = rxHz - (off || defaultOffset(rxHz));
+    else if (dup === "split") txHz = off;
+    else if (dup === "off") txHz = 0;
+    const tone = g("Tone");
+    const rTone = parseFloat(g("rToneFreq")) || 88.5;
+    const cTone = parseFloat(g("cToneFreq")) || 88.5;
+    const dcode = parseInt(g("DtcsCode"), 10) || 23;
+    const dpol = g("DtcsPolarity") || "NN";
+    let txTone = {kind:"none"}, rxTone = {kind:"none"};
+    if (tone === "Tone") txTone = {kind:"ctcss", freq:rTone};
+    else if (tone === "TSQL"){ txTone = {kind:"ctcss", freq:cTone}; rxTone = {kind:"ctcss", freq:cTone}; }
+    else if (tone === "DTCS"){
+      txTone = {kind:"dcs", code:dcode, pol:dpol[0] || "N"};
+      rxTone = {kind:"dcs", code:dcode, pol:dpol[1] || "N"};
+    }
+    writeChannel(loc, {rxHz, txHz, txTone, rxTone,
+      power: /low/i.test(g("Power")) ? 1 : 0,
+      wide: /^NFM$/i.test(g("Mode")) ? 0 : 1,
+      scan: /S/i.test(g("Skip")) ? 0 : 1,
+      bcl:0, pttid:0, scode:0, name: g("Name")});
+    count++;
+  }
+  log("CSV imported, " + count + " channels", "ok");
+  renderAll();
+}
+function download(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function blankImage(){ return new Uint8Array(IMG_SIZE).fill(0xFF); }
+function detectChannelBase(buf){
+  const cands = [[0x0008,0x1000],[0x0000,0x0FF8],[0x0000,0x1000],[0x0008,0x1008]];
+  let best = cands[0], bestScore = -1;
+  for (const [cb, nb] of cands){
+    let score = 0;
+    for (let n = 0; n < CH_COUNT; n++){
+      const hz = bcdToHz(buf.subarray(cb + n*16, cb + n*16 + 4));
+      if (hz !== null && inBand(hz)) score += 2;
+      const nm = buf.subarray(nb + n*16, nb + n*16 + 7);
+      let printable = 0, seen = 0;
+      for (const b of nm){ if (b === 0xFF) break; seen++; if (NAME_CHARS.includes(String.fromCharCode(b))) printable++; }
+      if (seen && printable === seen) score += 1;
+    }
+    if (score > bestScore){ bestScore = score; best = [cb, nb]; }
+  }
+  return best;
+}
+
+/* ================= self test ================= */
+function selfTest(){
+  const out = [];
+  const t = (name, fn) => {
+    let ok = false, err = "";
+    try { ok = fn() === true; } catch(e){ err = e.message; }
+    out.push({name: name + (err ? " (" + err + ")" : ""), ok});
+  };
+  const save = img, saveSel = sel, saveUndo = undoStack.length;
+
+  t("BCD round trip, 146.520 MHz", () =>
+    hex(hzToBcd(146520000)) === "00 20 65 14" && bcdToHz(hzToBcd(146520000)) === 146520000);
+  t("BCD round trip, 446.00625 MHz", () => bcdToHz(hzToBcd(446006250)) === 446006250);
+  t("BCD rejects 0xFF fill", () => bcdToHz(new Uint8Array([255,255,255,255])) === null);
+  t("CTCSS round trip, all 54 tones", () =>
+    CTCSS.every(f => { const d = decodeTone(encodeTone({kind:"ctcss", freq:f}));
+      return d.kind === "ctcss" && Math.abs(d.freq - f) < 0.05; }));
+  t("DCS round trip, normal and inverted", () =>
+    DCS.every(c => ["N","R"].every(p => {
+      const d = decodeTone(encodeTone({kind:"dcs", code:c, pol:p}));
+      return d.kind === "dcs" && d.code === c && d.pol === p; })));
+  t("DCS 023 N encodes to 0x2813", () => encodeTone({kind:"dcs", code:23, pol:"N"}) === 0x2813);
+  t("No tone maps to 0xFFFF and back", () => decodeTone(encodeTone({kind:"none"})).kind === "none");
+  t("Name codec keeps 7 characters", () => decodeName(encodeName("W3ABC12")) === "W3ABC12");
+  t("DTMF codec handles digits and symbols", () =>
+    decodeDtmf(encodeDtmf("12A*#", 5)) === "12A*#");
+  t("DTMF codec drops unsupported characters", () => decodeDtmf(encodeDtmf("1", 5)) === "1");
+  t("FM preset round trip, 88.5 and 107.9", () =>
+    Math.abs(decodeFm(encodeFm(88.5)) - 88.5) < 0.01 && Math.abs(decodeFm(encodeFm(107.9)) - 107.9) < 0.01);
+  t("FM preset empty stays empty", () => decodeFm(encodeFm(null)) === null);
+
+  img = blankImage();
+  t("Channel round trip through the image", () => {
+    writeChannel(5, {rxHz:147210000, txHz:147810000, txTone:{kind:"ctcss",freq:100.0},
+      rxTone:{kind:"none"}, power:1, wide:0, scan:1, bcl:0, pttid:0, scode:3, name:"TEST5"});
+    const c = readChannel(5);
+    return c.used && c.rxHz === 147210000 && c.txHz === 147810000 && c.name === "TEST5" &&
+      c.txTone.kind === "ctcss" && Math.abs(c.txTone.freq - 100.0) < 0.05 &&
+      c.power === 1 && c.wide === 0 && c.scan === 1 && c.scode === 3 && duplexOf(c).kind === "+";
+  });
+  t("Clearing a channel marks it empty", () => {
+    writeChannel(9, {rxHz:145000000, txHz:145000000, txTone:{kind:"none"}, rxTone:{kind:"none"},
+      power:0, wide:1, scan:1, bcl:0, pttid:0, scode:0, name:"X"});
+    clearChannel(9);
+    return readChannel(9).used === false;
+  });
+  t("Settings byte and bitfield write back", () => {
+    const sq = SETTINGS.find(f => f.k === "squelch"), sc = SETTINGS.find(f => f.k === "screv");
+    writeSetting(sq, 4); writeSetting(sc, 2);
+    return readSetting(sq) === 4 && readSetting(sc) === 2;
+  });
+  t("Settings bitfield leaves the rest of the byte alone", () => {
+    const sc = SETTINGS.find(f => f.k === "screv");
+    img[MAP.settings.base + sc.off] = 0xF0;
+    writeSetting(sc, 1);
+    return img[MAP.settings.base + sc.off] === 0xF1;
+  });
+  t("FM preset writes into the image", () => { writeFm(2, 101.1); return Math.abs(readFm(2) - 101.1) < 0.01; });
+  t("Undo restores the previous image", () => {
+    const before = img.slice(0);
+    pushUndo("test");
+    writeChannel(20, {rxHz:146520000, txHz:146520000, txTone:{kind:"none"}, rxTone:{kind:"none"},
+      power:0, wide:1, scan:1, bcl:0, pttid:0, scode:0, name:"UNDO"});
+    const changed = readChannel(20).used;
+    undo();
+    const back = readChannel(20).used === false;
+    const identical = img.every((b,i) => b === before[i]);
+    return changed && back && identical;
+  });
+  t("Redo reapplies the change", () => {
+    redo();
+    const on = readChannel(20).used;
+    undo();
+    return on === true;
+  });
+  t("Image size is 6472 bytes", () => blankImage().length === 6472);
+  t("Write ranges stay inside the main block", () =>
+    RANGES_FULL.every(([s,e]) => s >= MAIN_START && e <= MAIN_END) &&
+    RANGES_CHANNELS.every(([s,e]) => s >= MAIN_START && e <= MAIN_END));
+  t("Channel blocks are inside a writable range", () =>
+    writable(chOffset(0)) && writable(chOffset(127)) && writable(nameOffset(127)));
+  t("Dirty tracking finds exactly the block that changed", () => {
+    ref = img.slice(0);
+    img[MAP.channels.base + 32] ^= 0x01;
+    const d = dirtyBlocks();
+    return d.length === 1 && d[0] === MAP.channels.base + 32;
+  });
+  t("Default offsets follow the band", () =>
+    defaultOffset(146520000) === 600000 && defaultOffset(446000000) === 5000000);
+  t("CSV line parser handles quoted commas", () =>
+    parseCsvLine('1,"A,B",146.520')[1] === "A,B");
+  t("Region lookup names a channel offset", () => regionOf(MAP.channels.base + 16) === "channels");
+  t("No two regions overlap", () => overlaps().length === 0);
+  t("Every region lands in a writable range", () =>
+    Object.values(MAP).every(r => writable(r.base) && writable(r.base + r.span - 1)));
+
+  img = save; sel = saveSel; ref = null;
+  undoStack.length = saveUndo; redoStack.length = 0;
+  refreshUndo();
+  if (img) renderAll();
+
+  const el = $("testOut");
+  el.innerHTML = "";
+  let fails = 0;
+  for (const r of out){
+    if (!r.ok) fails++;
+    const d = document.createElement("div");
+    d.className = "testrow " + (r.ok ? "pass" : "fail");
+    d.textContent = r.name;
+    el.appendChild(d);
+  }
+  const sum = document.createElement("p");
+  sum.className = "note";
+  sum.textContent = (out.length - fails) + " of " + out.length + " checks passed.";
+  el.appendChild(sum);
+  $("dlgTest").showModal();
+  log("Self test: " + (out.length - fails) + "/" + out.length + " passed", fails ? "err" : "ok");
+}
+
+/* ================= wiring ================= */
+$("stamp").textContent = "v" + VERSION;
+try {
+  const th = localStorage.getItem("clarion.theme") || "night";
+  document.documentElement.dataset.theme = th;
+  $("theme").value = th;
+  const m = localStorage.getItem("clarion.map");
+  if (m){
+    const parsed = JSON.parse(m);
+    for (const k of Object.keys(MAP)) if (parsed[k]) Object.assign(MAP[k], parsed[k]);
+    log("Loaded a saved memory map");
+  }
+} catch(_){ document.documentElement.dataset.theme = "night"; }
+
+$("theme").addEventListener("change", e => {
+  document.documentElement.dataset.theme = e.target.value;
+  try { localStorage.setItem("clarion.theme", e.target.value); } catch(_){}
+});
+
+if (!("serial" in navigator)){
+  $("serialNote").textContent = "This browser has no Web Serial support. Chrome or Edge on desktop can talk to the cable. Files and editing still work here.";
+  $("btnConnect").disabled = true;
+}
+
+// tabs
+const PANES = {tabChannels:"paneChannels", tabSettings:"paneSettings", tabDtmf:"paneDtmf",
+  tabFm:"paneFm", tabMap:"paneMap"};
+for (const t of Object.keys(PANES)){
+  $(t).addEventListener("click", () => {
+    for (const [k,v] of Object.entries(PANES)){
+      $(k).setAttribute("aria-selected", k === t ? "true" : "false");
+      $(v).classList.toggle("hidden", k !== t);
+    }
+  });
+}
+
+$("btnUndo").addEventListener("click", undo);
+$("btnRedo").addEventListener("click", redo);
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === "z" && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if ((e.key === "z" && e.shiftKey) || e.key === "y"){ e.preventDefault(); redo(); }
+});
+
+$("btnConnect").addEventListener("click", async () => {
+  try{
+    await link.connect();
+    $("radioStatus").innerHTML = "Cable: <b>connected at 9600 baud</b>";
+    $("btnConnect").disabled = true; $("btnDisconnect").disabled = false;
+    $("btnRead").disabled = false; $("btnWrite").disabled = false;
+    log("Serial port opened", "ok");
+  } catch(e){ log("Connect failed: " + e.message, "err"); }
+});
+$("btnDisconnect").addEventListener("click", async () => {
+  await link.disconnect();
+  $("radioStatus").innerHTML = "Cable: <b>not connected</b>";
+  $("btnConnect").disabled = false; $("btnDisconnect").disabled = true;
+  $("btnRead").disabled = true; $("btnWrite").disabled = true;
+  log("Serial port released");
+});
+$("btnRead").addEventListener("click", async () => {
+  $("btnRead").disabled = true; $("btnWrite").disabled = true;
+  setBar(0);
+  try{
+    log("Reading radio memory");
+    const buf = await readRadio();
+    img = buf;
+    ref = buf.slice(0);
+    MAP.channels.base = 0x0008; MAP.names.base = 0x1000;
+    undoStack.length = 0; redoStack.length = 0; refreshUndo();
+    const fw = Array.from(img.slice(FW_START, FW_END))
+      .filter(b => b >= 32 && b < 127).map(c => String.fromCharCode(c)).join("").trim();
+    $("identStatus").innerHTML = "Ident: <b>" + hex(identBytes) + "</b>" + (fw ? " &middot; " + fw : "");
+    log("Read complete, " + img.length + " bytes. This image is now the reference.", "ok");
+    sel = 0; renderAll();
+  } catch(e){ log("Read failed: " + e.message, "err"); }
+  finally { $("btnRead").disabled = false; $("btnWrite").disabled = false; }
+});
+
+$("btnWrite").addEventListener("click", () => {
+  if (!img){ log("Nothing to write", "err"); return; }
+  const scope = $("writeScope").value;
+  if (scope === "dirty" && !ref){
+    log("Changed-blocks mode needs a reference. Read the radio or open an image first.", "err");
+    return;
+  }
+  const blocks = plannedBlocks(scope);
+  if (!blocks.length){ log("Nothing to write, no blocks selected", "err"); return; }
+  const touched = new Set();
+  for (const o of blocks){
+    const k = regionOf(o);
+    touched.add(k ? k : "unmapped");
+  }
+  $("writeSummary").textContent = blocks.length + " block" + (blocks.length === 1 ? "" : "s") +
+    " of 16 bytes, " + (blocks.length * 16) + " bytes total.";
+  const rd = $("writeRegions");
+  rd.innerHTML = "";
+  const unver = [];
+  for (const k of touched){
+    const p = document.createElement("p");
+    p.className = "status";
+    if (k === "unmapped"){ p.innerHTML = "Region: <b>unmapped bytes</b> <span class='pill no'>unknown</span>"; }
+    else {
+      const ok = MAP[k].verified;
+      if (!ok) unver.push(MAP[k].label);
+      p.innerHTML = "Region: <b>" + MAP[k].label + "</b> <span class='pill " + (ok ? "ok" : "no") + "'>" +
+        (ok ? "verified" : "unconfirmed offset") + "</span>";
+    }
+    rd.appendChild(p);
+  }
+  const box = $("writeUnver");
+  $("ackUnver").checked = false;
+  if (unver.length){
+    $("ackText").textContent = "These regions have offsets that have not been confirmed against a radio: " +
+      unver.join(", ") + ". I have a saved image backup and I accept the risk.";
+    box.classList.remove("hidden");
+  } else box.classList.add("hidden");
+  $("dlgWrite").showModal();
+});
+$("btnWriteCancel").addEventListener("click", () => $("dlgWrite").close());
+$("btnWriteGo").addEventListener("click", async () => {
+  if (!$("writeUnver").classList.contains("hidden") && !$("ackUnver").checked){
+    log("Write held. Confirm the unverified regions, or change the write scope.", "err");
+    return;
+  }
+  $("dlgWrite").close();
+  const blocks = plannedBlocks($("writeScope").value);
+  $("btnRead").disabled = true; $("btnWrite").disabled = true;
+  setBar(0);
+  try{
+    log("Writing " + blocks.length + " blocks");
+    await writeRadio(blocks);
+    ref = img.slice(0);
+    refreshDirty();
+    log("Write complete. Power cycle the radio. The working image is now the reference.", "ok");
+  } catch(e){
+    log("Write failed: " + e.message, "err");
+    log("If the radio is unhappy, reconnect and write a known good image back.", "err");
+  } finally { $("btnRead").disabled = false; $("btnWrite").disabled = false; }
+});
+
+$("btnOpenImg").addEventListener("click", () => $("fileImg").click());
+$("fileImg").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const buf = new Uint8Array(await f.arrayBuffer());
+  const a = blankImage();
+  a.set(buf.subarray(0, Math.min(buf.length, IMG_SIZE)));
+  img = a; ref = a.slice(0);
+  const [cb, nb] = detectChannelBase(img);
+  MAP.channels.base = cb; MAP.names.base = nb;
+  undoStack.length = 0; redoStack.length = 0; refreshUndo();
+  log("Opened " + f.name + ", " + buf.length + " bytes. Channel base 0x" + cb.toString(16) +
+      ", names 0x" + nb.toString(16), "ok");
+  if (buf.length !== IMG_SIZE) log("Expected 6472 bytes, padding the remainder", "err");
+  sel = 0; renderAll();
+  e.target.value = "";
+});
+$("btnSaveImg").addEventListener("click", () => {
+  download(new Blob([img], {type:"application/octet-stream"}),
+    "uv5r-" + new Date().toISOString().slice(0,10) + ".img");
+  log("Image saved", "ok");
+});
+$("btnBlank").addEventListener("click", () => {
+  img = blankImage(); ref = null;
+  MAP.channels.base = 0x0008; MAP.names.base = 0x1000;
+  undoStack.length = 0; redoStack.length = 0; refreshUndo();
+  sel = 0;
+  log("Blank channel set. Writing this to a radio erases its memories.");
+  renderAll();
+});
+$("btnImportCsv").addEventListener("click", () => {
+  if (!img){ img = blankImage(); ref = null; }
+  $("fileCsv").click();
+});
+$("fileCsv").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  importCsv(await f.text());
+  e.target.value = "";
+});
+$("btnExportCsv").addEventListener("click", exportCsv);
+
+$("btnExportMap").addEventListener("click", () => {
+  download(new Blob([JSON.stringify(MAP, null, 2)], {type:"application/json"}), "clarion-map.json");
+  log("Memory map saved", "ok");
+});
+$("btnImportMap").addEventListener("click", () => $("fileMap").click());
+$("fileMap").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const parsed = JSON.parse(await f.text());
+    for (const k of Object.keys(MAP)) if (parsed[k]) Object.assign(MAP[k], parsed[k]);
+    try { localStorage.setItem("clarion.map", JSON.stringify(MAP)); } catch(_){}
+    log("Memory map loaded from " + f.name, "ok");
+    renderAll();
+  } catch(err){ log("Map file could not be read: " + err.message, "err"); }
+  e.target.value = "";
+});
+
+$("btnUsedOnly").addEventListener("click", e => {
+  usedOnly = !usedOnly;
+  e.target.textContent = usedOnly ? "Show all 128" : "Show used only";
+  renderTable();
+});
+$("btnClearCh").addEventListener("click", () => {
+  if (sel < 0) return;
+  pushUndo("clear channel " + String(sel).padStart(3,"0"));
+  clearChannel(sel);
+  log("Channel " + String(sel).padStart(3,"0") + " cleared");
+  renderAll();
+});
+$("btnCopyCh").addEventListener("click", () => {
+  if (sel < 0) return;
+  const src = readChannel(sel);
+  if (!src.used){ log("Nothing to copy from an empty channel", "err"); return; }
+  for (let n = 0; n < CH_COUNT; n++){
+    if (!readChannel(n).used){
+      pushUndo("copy channel into " + String(n).padStart(3,"0"));
+      writeChannel(n, src);
+      log("Copied channel " + sel + " into " + n, "ok");
+      sel = n; renderAll();
+      return;
+    }
+  }
+  log("No free channel available", "err");
+});
+$("btnApply").addEventListener("click", applyEdit);
+const autoOffset = () => {
+  const rx = parseFloat($("fRx").value), dup = $("fDup").value;
+  if (isFinite(rx) && (dup === "+" || dup === "-") && !$("fOff").value)
+    $("fOff").value = fmtMHz(defaultOffset(Math.round(rx * 1e6)));
+};
+$("fRx").addEventListener("change", autoOffset);
+$("fDup").addEventListener("change", autoOffset);
+
+$("btnSetApply").addEventListener("click", applySettings);
+$("btnSetRevert").addEventListener("click", () => { renderSettings(); log("Settings form reset to the image"); });
+$("btnDtmfApply").addEventListener("click", applyDtmf);
+$("btnDtmfRevert").addEventListener("click", () => { renderDtmf(); log("DTMF form reset to the image"); });
+$("btnFmApply").addEventListener("click", applyFm);
+$("btnFmRevert").addEventListener("click", () => { renderFm(); log("FM form reset to the image"); });
+$("btnFmClear").addEventListener("click", () => {
+  if (!img) return;
+  pushUndo("clear FM presets");
+  for (let i = 0; i < 25; i++) writeFm(i, null);
+  log("FM presets cleared");
+  renderAll();
+});
+
+$("btnMapApply").addEventListener("click", applyMap);
+$("btnMapReset").addEventListener("click", () => {
+  MAP = structuredClone(MAP_DEFAULT);
+  try { localStorage.removeItem("clarion.map"); } catch(_){}
+  log("Memory map reset to defaults");
+  renderAll();
+});
+$("btnCmpFile").addEventListener("click", () => $("fileCmp").click());
+$("fileCmp").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const buf = new Uint8Array(await f.arrayBuffer());
+  cmp = blankImage();
+  cmp.set(buf.subarray(0, Math.min(buf.length, IMG_SIZE)));
+  renderDiff(cmp, f.name);
+  e.target.value = "";
+});
+$("btnCmpRef").addEventListener("click", () => renderDiff(ref, "the last read"));
+$("btnSetRef").addEventListener("click", () => {
+  if (!img) return;
+  ref = img.slice(0);
+  refreshDirty();
+  log("Current image is now the reference", "ok");
+});
+$("btnHexGo").addEventListener("click", () => {
+  const v = parseInt($("hexGo").value.replace(/^0x/i, ""), 16);
+  if (!isFinite(v) || v < 0 || v >= IMG_SIZE){ log("Offset out of range", "err"); return; }
+  hexBase = v & ~0x0F;
+  renderHex();
+});
+$("btnHexApply").addEventListener("click", applyHex);
+
+$("btnTest").addEventListener("click", selfTest);
+$("btnCloseTest").addEventListener("click", () => $("dlgTest").close());
+$("btnClearLog").addEventListener("click", () => { $("log").innerHTML = ""; });
+
+renderMap();
+log("CLARION v" + VERSION + " ready. Read the radio, save the image, then edit.");
+log("Settings, DTMF, and FM offsets are unconfirmed. See the Map and diff tab.");
+</script>
+</body>
+</html>
